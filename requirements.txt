@@ -1,0 +1,15 @@
+# Bengali OCR — Python dependencies
+# Install with:  pip install -r requirements.txt
+ 
+# Deep learning (CPU version — no GPU needed)
+torch==2.2.2
+torchvision==0.17.2
+ 
+# Image processing
+opencv-python==4.9.0.80
+Pillow==10.3.0
+ 
+
+regex==2024.4.16
+ 
+numpy>=1.24.0

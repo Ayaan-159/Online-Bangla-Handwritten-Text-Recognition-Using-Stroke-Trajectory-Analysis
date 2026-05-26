@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Bengali OCR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0c0d0f;
+  --surface:   #141618;
+  --raised:    #1c1e22;
+  --border:    #2a2d33;
+  --border2:   #363a42;
+  --text:      #e8e9ec;
+  --muted:     #6b7280;
+  --accent:    #f0a500;
+  --accent2:   #3b9eff;
+  --green:     #22c55e;
+  --red:       #ef4444;
+
+  /* line colours matching backend */
+  --lc0: #fc5c7c; --lc1: #38bdf8; --lc2: #22c55e;
+  --lc3: #f59e0b; --lc4: #a855f7; --lc5: #fb923c;
+  --lc6: #ec4899; --lc7: #14b8a6; --lc8: #6366f1;
+  --lc9: #ef4444; --lc10:#facc15; --lc11:#34d399;
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  padding: 0 32px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px;
+  letter-spacing: -0.3px;
+  color: var(--accent);
+}
+.logo-sub {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-left: auto;
+  transition: background .3s;
+}
+.status-dot.ready  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.error  { background: var(--red); }
+.status-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── MAIN LAYOUT ── */
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  overflow: hidden;
+  height: calc(100vh - 56px);
+}
+
+/* ── LEFT PANEL ── */
+.left {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.section-title {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 12px;
+}
+
+/* Upload */
+.drop {
+  border: 1.5px dashed var(--border2);
+  border-radius: 10px;
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color .2s, background .2s;
+}
+.drop:hover, .drop.over {
+  border-color: var(--accent);
+  background: rgba(240,165,0,.04);
+}
+.drop input { position: absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.drop-icon { font-size: 24px; margin-bottom: 6px; }
+.drop p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.drop strong { color: var(--text); }
+
+.preview-img {
+  width: 100%; border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: 10px; display: none;
+}
+
+/* Run button */
+.run-btn {
+  width: 100%; padding: 11px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600; font-size: 14px;
+  cursor: pointer; transition: opacity .15s, transform .1s;
+  letter-spacing: 0.2px;
+  margin-top: 10px;
+}
+.run-btn:hover { opacity: .88; }
+.run-btn:active { transform: scale(.98); }
+.run-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* Stats */
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.stat {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.stat-n {
+  font-family: 'DM Mono', monospace;
+  font-size: 22px; font-weight: 500;
+  color: var(--accent); line-height: 1;
+}
+.stat-l { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+/* Line list */
+.line-list {
+  flex: 1; overflow-y: auto; padding: 8px 0;
+}
+.line-item {
+  padding: 9px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background .12s, border-color .12s;
+  display: flex; align-items: center; gap: 10px;
+}
+.line-item:hover { background: var(--raised); }
+.line-item.active {
+  background: var(--raised);
+}
+.line-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.line-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--muted); flex-shrink: 0;
+}
+.line-preview {
+  font-size: 12px; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; flex: 1;
+  direction: rtl; text-align: left;
+}
+.line-count {
+  font-size: 10px; color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* Full text box */
+.full-text {
+  width: 100%; padding: 10px 12px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text); font-size: 13px;
+  line-height: 1.7; resize: vertical;
+  min-height: 80px; max-height: 140px;
+  font-family: inherit;
+  direction: rtl;
+}
+.copy-btn {
+  width: 100%; margin-top: 6px; padding: 7px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 6px; color: var(--muted);
+  font-size: 12px; cursor: pointer;
+  transition: border-color .15s, color .15s;
+  font-family: 'DM Mono', monospace;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── RIGHT PANEL ── */
+.right {
+  display: flex; flex-direction: column;
+  overflow: hidden; background: var(--bg);
+}
+
+/* View tabs */
+.view-tabs {
+  display: flex; gap: 0; padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.vtab {
+  padding: 12px 16px;
+  font-size: 12px; font-family: 'DM Mono', monospace;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  color: var(--muted); background: none;
+  border-left: none; border-right: none; border-top: none;
+  transition: color .15s;
+}
+.vtab:hover { color: var(--text); }
+.vtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Canvas */
+.canvas-area {
+  flex: 1; overflow: auto;
+  display: flex; align-items: flex-start;
+  justify-content: center; padding: 24px;
+  position: relative;
+}
+.canvas-area img {
+  max-width: 100%; height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* Loading overlay */
+.loading-ov {
+  position: absolute; inset: 0;
+  background: rgba(12,13,15,.85);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; z-index: 20;
+}
+.loading-ov.on { display: flex; }
+.spin {
+  width: 38px; height: 38px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-txt {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px; color: var(--muted);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+/* Empty state */
+.empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; width: 100%; height: 100%;
+  color: var(--muted); font-size: 13px; text-align: center;
+}
+.empty-icon { font-size: 44px; opacity: .4; }
+
+/* Line detail view */
+.line-detail {
+  padding: 20px; overflow-y: auto;
+  height: 100%;
+}
+.ld-header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.ld-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.ld-title { font-family: 'Instrument Serif', serif; font-size: 20px; }
+.ld-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+.ld-text {
+  font-size: 16px; line-height: 1.9;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 16px;
+  margin-bottom: 16px; direction: rtl;
+  font-family: 'Instrument Serif', serif;
+}
+.ld-text:empty::before { content: '—'; color: var(--muted); font-size: 13px; }
+
+.words-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+}
+.word-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+  transition: border-color .15s, transform .1s;
+  cursor: default;
+}
+.word-card:hover {
+  border-color: var(--border2);
+  transform: scale(1.03);
+}
+.word-card img {
+  width: 100%; display: block;
+  background: white;
+}
+.word-card .wlabel {
+  padding: 4px 6px;
+  font-size: 11px; text-align: center;
+  color: var(--text); font-family: 'DM Mono', monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-top: 1px solid var(--border);
+}
+.word-card .wlabel:empty::before { content: '?'; color: var(--muted); }
+
+/* Word top indicator (line color) */
+.word-card .wind {
+  height: 3px;
+}
+
+/* Error banner */
+.error-banner {
+  background: rgba(239,68,68,.1);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #fca5a5; padding: 10px 14px;
+  border-radius: 8px; font-size: 12px;
+  margin: 12px 16px; display: none;
+}
+.error-banner.show { display: block; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">BN-DRISHTI</span>
+  <span class="logo-sub">Bengali OCR</span>
+  <span class="status-label" id="statusLabel">checking…</span>
+  <span class="status-dot" id="statusDot"></span>
+</header>
+
+<div class="main">
+
+  <!-- ── LEFT ── -->
+  <aside class="left">
+
+    <div class="section">
+      <div class="section-title">Input</div>
+      <div class="drop" id="drop">
+        <input type="file" id="fileInput" accept="image/*"/>
+        <div class="drop-icon">🖼</div>
+        <p><strong>Drop image here</strong><br/>or click to browse</p>
+      </div>
+      <img id="preview" class="preview-img" alt=""/>
+      <button class="run-btn" id="runBtn" disabled>▶  Recognise</button>
+      <div class="error-banner" id="errBanner"></div>
+    </div>
+
+    <div class="section" id="statsSection" style="display:none">
+      <div class="section-title">Result</div>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-n" id="sLines">—</div>
+          <div class="stat-l">Lines</div>
+        </div>
+        <div class="stat">
+          <div class="stat-n" id="sWords">—</div>
+          <div class="stat-l">Words</div>
+        </div>
+        <div class="stat">
+          <div class="stat-n" id="sTime">—</div>
+          <div class="stat-l">Seconds</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="textSection" style="display:none">
+      <div class="section-title">Full Text</div>
+      <textarea class="full-text" id="fullText" readonly></textarea>
+      <button class="copy-btn" id="copyBtn">copy text</button>
+    </div>
+
+    <div class="line-list" id="lineList"></div>
+
+  </aside>
+
+  <!-- ── RIGHT ── -->
+  <main class="right">
+    <div class="view-tabs">
+      <button class="vtab active" data-v="overlay">Segmentation Overlay</button>
+      <button class="vtab" data-v="line">Line Detail</button>
+    </div>
+
+    <div class="canvas-area" id="canvasArea">
+      <div class="loading-ov" id="loadingOv">
+        <div class="spin"></div>
+        <div class="spin-txt" id="spinTxt">Running pipeline…</div>
+      </div>
+
+      <!-- Overlay view -->
+      <div id="overlayView" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">
+        <div class="empty" id="emptyState">
+          <div class="empty-icon">✍️</div>
+          <div>Upload a Bengali handwriting image<br/>and click <strong>Recognise</strong></div>
+        </div>
+        <img id="overlayImg" style="display:none" alt="segmentation overlay"/>
+      </div>
+
+      <!-- Line detail view -->
+      <div id="lineView" style="width:100%;height:100%;display:none;overflow:auto">
+        <div class="line-detail" id="lineDetail">
+          <div class="empty">
+            <div class="empty-icon">←</div>
+            <div>Select a line from the left panel</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let resultData   = null;
+let currentView  = "overlay";
+let selectedLine = null;
+let currentFile  = null;
+
+// Line colour palette (matches backend LINE_COLORS_BGR, converted to CSS)
+const LINE_CSS = [
+  "#fc5c7c","#38bdf8","#22c55e","#f59e0b","#a855f7","#fb923c",
+  "#ec4899","#14b8a6","#6366f1","#ef4444","#facc15","#34d399",
+];
+
+// ─── Status check ─────────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const r = await fetch("/api/status");
+    const d = await r.json();
+    const dot   = document.getElementById("statusDot");
+    const label = document.getElementById("statusLabel");
+    if (d.segmentation_ready) {
+      dot.className   = "status-dot ready";
+      label.textContent = d.ocr_ready ? "OCR ready" : "seg ready · no OCR";
+    } else {
+      dot.className   = "status-dot error";
+      label.textContent = "models not loaded";
+    }
+  } catch { }
+}
+checkStatus();
+
+// ─── Upload ───────────────────────────────────────────────────────────────────
+const drop = document.getElementById("drop");
+const fi   = document.getElementById("fileInput");
+fi.addEventListener("change", e => handleFile(e.target.files[0]));
+drop.addEventListener("dragover",  e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("over");
+  handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(f) {
+  if (!f) return;
+  currentFile = f;
+  const url   = URL.createObjectURL(f);
+  const prev  = document.getElementById("preview");
+  prev.src    = url; prev.style.display = "block";
+  document.getElementById("runBtn").disabled = false;
+  hideError();
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".vtab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".vtab").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  currentView = t.dataset.v;
+  switchView(currentView);
+}));
+
+function switchView(v) {
+  document.getElementById("overlayView").style.display = v === "overlay" ? "flex" : "none";
+  document.getElementById("lineView").style.display    = v === "line"    ? "block" : "none";
+}
+
+// ─── Run ──────────────────────────────────────────────────────────────────────
+const MSGS = [
+  "Detecting paragraph blocks…",
+  "Detecting word bounding boxes…",
+  "Clustering words into lines…",
+  "Running OCR on word crops…",
+  "Building response…",
+];
+
+document.getElementById("runBtn").addEventListener("click", async () => {
+  if (!currentFile) return;
+  setLoading(true, MSGS[0]);
+  let mi = 0;
+  const iv = setInterval(() => setLoading(true, MSGS[++mi % MSGS.length]), 1100);
+  document.getElementById("runBtn").disabled = true;
+  hideError();
+
+  const fd = new FormData();
+  fd.append("image", currentFile);
+
+  try {
+    const r = await fetch("/api/recognize", { method: "POST", body: fd });
+    const d = await r.json();
+    clearInterval(iv);
+    if (d.error) showError(d.error);
+    else { resultData = d; renderResult(d); }
+  } catch(e) {
+    clearInterval(iv);
+    showError("Network error: " + e.message);
+  } finally {
+    setLoading(false);
+    document.getElementById("runBtn").disabled = false;
+  }
+});
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function renderResult(d) {
+  // Stats
+  document.getElementById("sLines").textContent = d.stats.lines;
+  document.getElementById("sWords").textContent = d.stats.words;
+  document.getElementById("sTime").textContent  = d.stats.elapsed_s + "s";
+  document.getElementById("statsSection").style.display = "";
+
+  // Full text
+  document.getElementById("fullText").value = d.full_text || "";
+  document.getElementById("textSection").style.display = "";
+
+  // Overlay image
+  const img = document.getElementById("overlayImg");
+  img.src   = d.annotated_image;
+  img.style.display = "block";
+  document.getElementById("emptyState").style.display = "none";
+
+  // Line list
+  buildLineList(d.lines);
+
+  // Auto-select first line
+  if (d.lines.length > 0) {
+    selectLine(d.lines[0]);
+  }
+}
+
+function buildLineList(lines) {
+  const ul = document.getElementById("lineList");
+  ul.innerHTML = "";
+
+  lines.forEach(line => {
+    const color   = LINE_CSS[(line.line_id - 1) % LINE_CSS.length];
+    const preview = line.line_text || "(no text)";
+    const item    = document.createElement("div");
+    item.className = "line-item";
+    item.style.borderLeftColor = "transparent";
+    item.innerHTML = `
+      <div class="line-dot" style="background:${color}"></div>
+      <span class="line-label">L${line.line_id}</span>
+      <span class="line-preview">${preview}</span>
+      <span class="line-count">${line.word_count}w</span>`;
+    item.addEventListener("click", () => {
+      document.querySelectorAll(".line-item").forEach(x => {
+        x.classList.remove("active");
+        x.style.borderLeftColor = "transparent";
+      });
+      item.classList.add("active");
+      item.style.borderLeftColor = color;
+      selectLine(line);
+    });
+    ul.appendChild(item);
+  });
+}
+
+function selectLine(line) {
+  selectedLine = line;
+  renderLineDetail(line);
+  // Switch to line view
+  document.querySelectorAll(".vtab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".vtab")[1].classList.add("active");
+  currentView = "line";
+  switchView("line");
+}
+
+function renderLineDetail(line) {
+  const color = LINE_CSS[(line.line_id - 1) % LINE_CSS.length];
+  const det   = document.getElementById("lineDetail");
+
+  det.innerHTML = `
+    <div class="ld-header">
+      <div class="ld-dot" style="background:${color}"></div>
+      <div class="ld-title">Line ${line.line_id}</div>
+      <div class="ld-meta">${line.word_count} words · conf ${line.conf.toFixed(2)}</div>
+    </div>
+    <div class="ld-text">${line.line_text || ""}</div>
+    <div class="section-title" style="margin-bottom:10px">Word crops</div>
+    <div class="words-grid" id="wordsGrid"></div>`;
+
+  const grid = document.getElementById("wordsGrid");
+  line.words.forEach(word => {
+    const card = document.createElement("div");
+    card.className = "word-card";
+    card.innerHTML = `
+      <div class="wind" style="background:${color}"></div>
+      <img src="${word.crop_image}" alt="" loading="lazy"/>
+      <div class="wlabel">${word.text || ""}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ─── Copy ──────────────────────────────────────────────────────────────────────
+document.getElementById("copyBtn").addEventListener("click", () => {
+  const txt = document.getElementById("fullText").value;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.getElementById("copyBtn");
+    btn.textContent = "copied ✓";
+    setTimeout(() => btn.textContent = "copy text", 1800);
+  });
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function setLoading(on, msg = "") {
+  const ov = document.getElementById("loadingOv");
+  ov.classList.toggle("on", on);
+  if (msg) document.getElementById("spinTxt").textContent = msg;
+}
+
+function showError(msg) {
+  const b = document.getElementById("errBanner");
+  b.textContent = "⚠ " + msg;
+  b.classList.add("show");
+}
+
+function hideError() {
+  document.getElementById("errBanner").classList.remove("show");
+}
+</script>
+</body>
+</html>
