@@ -169,14 +169,11 @@ Evaluated on BanglaWriting test set — 500 samples:
 1. QuwsarOhi / Safir et al. — *End-to-End OCR for Bengali Handwritten Words* — [GitHub](https://github.com/QuwsarOhi/bengali_word_ocr)
 2. BN-DRISHTI — Bengali handwriting segmentation — crusnic-corp
 3. Huang et al. — *Densely Connected Convolutional Networks* — CVPR 2017
-4. Graves et al. — *Connectionist Temporal Classification* — ICML 2006
-5. Cho et al. — *Learning Phrase Representations using RNN Encoder-Decoder* — EMNLP 2014
-6. Kingma & Ba — *Adam: A Method for Stochastic Optimization* — ICLR 2015
+
 
 ---
 
 ## Note
 
 Pre-trained model weights (`line_model_best.pt`, `word_model_best.pt`) are from the BN-DRISHTI team.  
-BanglaWriting dataset belongs to its original authors.  
-This project integrates both for academic purposes.
+We are committed to elevating our project.
